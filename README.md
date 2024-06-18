@@ -21,3 +21,15 @@ pip install kfp==2.7.0
 ```
 -----------------
 
+# How to deploy Kubeflow app
+When YAML file of app is compiled, you can either deploy it on local or cloud based host.
+
+## Local Deployment
+You can deploy Kubeflow locally using tools like Minikube or Kind (Kubernetes in Docker). This approach is great for development and testing purposes.
+
+Minikube: Minikube is a tool that runs a single-node Kubernetes cluster on your local machine.
+
+Kind: Kind runs Kubernetes clusters in Docker containers.
+
+## Cloud Deployment
+Kubeflow can be deployed on various cloud platforms, including Google Cloud Platform (GCP), Amazon Web Services (AWS), Microsoft Azure.
