@@ -1,6 +1,4 @@
-from kfp import components
-from kfp import dsl
-
+import kfp.dsl as dsl
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -10,10 +8,16 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn import metrics
 import string
+from typing import List
+import joblib
 
 
 # Component 1: Extract data
-def extract_data():
+@dsl.component(
+    base_image='python:3.8',  # Specifying the base image
+    packages_to_install=['requests', 'pandas']
+)
+def extract_data() -> dsl.OutputPath(str):
     import requests
     import zipfile
     import io
@@ -32,19 +36,21 @@ def extract_data():
             df = pd.read_csv(f, sep='\t', names=["label", "message"], header=None)
 
     # Step 4: Save the DataFrame to a CSV file
-    df.to_csv('/mnt/data/smsspamcollection.csv', index=False)
+    output_path = '/mnt/data/smsspamcollection.csv'
+    df.to_csv(output_path, index=False)
 
-    return '/mnt/data/smsspamcollection.csv'
-
-extract_data_op = components.func_to_container_op(
-    extract_data, 
-    base_image='python:3.7', 
-    packages_to_install=['pandas', 'requests']
-)
+    return output_path
 
 
 # Component 2: Data Preprocessing
-def preprocess_data(file_path: str):
+@dsl.component(
+    base_image='python:3.8',
+    packages_to_install=['pandas']
+)
+def preprocess_data(file_path: dsl.InputPath(str)) -> None:
+    import pandas as pd
+    import string
+    
     df = pd.read_csv(file_path)
     
     # Add 'length' and 'punct' features
@@ -54,18 +60,18 @@ def preprocess_data(file_path: str):
     # Save the preprocessed data
     df.to_csv('/mnt/data/preprocessed_smsspamcollection.csv', index=False)
 
-    return '/mnt/data/preprocessed_smsspamcollection.csv'
-
-preprocess_data_op = components.func_to_container_op(
-    preprocess_data, 
-    base_image='python:3.7', 
-    packages_to_install=['pandas']
-)
-
 
 # Component 3: Exploratory Data Analysis (EDA)
-def eda(file_path: str):
-    df = pd.read_csv(file_path)
+@dsl.component(
+    base_image='python:3.8',
+    packages_to_install=['pandas', 'matplotlib', 'numpy']
+)
+def eda() -> None:
+    import pandas as pd
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    df = pd.read_csv('/mnt/data/preprocessed_smsspamcollection.csv')
 
     print('Missing values: ')
     print(df.isnull().sum(),'\n')
@@ -96,54 +102,55 @@ def eda(file_path: str):
     plt.ylabel('Category rate')
     plt.savefig('/mnt/data/punct_histogram.png')
 
-eda_op = components.func_to_container_op(
-    eda, 
-    base_image='python:3.7', 
-    packages_to_install=['pandas', 'matplotlib', 'numpy']
-)
-
 
 # Component 4: Train Model
-def train_model(file_path: str):
-    df = pd.read_csv(file_path)
+@dsl.component(
+    base_image='python:3.8',
+    packages_to_install=['pandas', 'scikit-learn', 'joblib']
+)
+def train_model() -> None:
+    import pandas as pd
+    from sklearn.model_selection import train_test_split
+    from sklearn.pipeline import Pipeline
+    from sklearn.ensemble import RandomForestClassifier
+    from sklearn.feature_extraction.text import TfidfVectorizer
+    from sklearn import metrics
+    import joblib
+
+    df = pd.read_csv('/mnt/data/preprocessed_smsspamcollection.csv')
 
     X = df['message']
     y = df['label']
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.33, random_state=0)
 
-    text_clf = Pipeline([('tfidf',TfidfVectorizer()),('clf',RandomForestClassifier())])
+    text_clf = Pipeline([('tfidf', TfidfVectorizer()), ('clf', RandomForestClassifier())])
     text_clf.fit(X_train, y_train)
 
     predictions = text_clf.predict(X_test)
 
-    df_conf_mat = pd.DataFrame(metrics.confusion_matrix(y_test, predictions), index=['ham','spam'], columns=['ham','spam'])
-    print(df_conf_mat,'\n')
+    df_conf_mat = pd.DataFrame(metrics.confusion_matrix(y_test, predictions), index=['ham', 'spam'], columns=['ham', 'spam'])
+    print(df_conf_mat, '\n')
 
     clf_report = metrics.classification_report(y_test, predictions)
-    print(clf_report,'\n')
+    print(clf_report, '\n')
 
-    acc = metrics.accuracy_score(y_test,predictions)
-    print('Model accuracy: ', acc*100)
+    acc = metrics.accuracy_score(y_test, predictions)
+    print('Model accuracy: ', acc * 100)
 
-    return text_clf
-
-train_model_op = components.func_to_container_op(
-    train_model, 
-    base_image='python:3.7', 
-    packages_to_install=['pandas', 'scikit-learn']
-)
+    # Save the model to a file
+    joblib.dump(text_clf, '/mnt/data/text_clf.joblib')
 
 
 # Component 5: Test Model
-def test_model(model, sample_messages: list):
+@dsl.component(
+    base_image='python:3.8',
+    packages_to_install=['scikit-learn', 'joblib']
+)
+def test_model( sample_messages: List[str]) -> List[str]:
+    import joblib
+    model = joblib.load('/mnt/data/text_clf.joblib')
     predictions = model.predict(sample_messages)
     return predictions
-
-test_model_op = components.func_to_container_op(
-    test_model, 
-    base_image='python:3.7', 
-    packages_to_install=['scikit-learn']
-)
 
 
 # Define the pipeline
@@ -153,20 +160,23 @@ test_model_op = components.func_to_container_op(
 )
 def sms_spam_detection_pipeline():
     # Step 1: Extract data
-    extracted_data = extract_data_op()
-
+    extracted_data = extract_data()
+    print(extracted_data.output)
     # Step 2: Preprocess data
-    preprocessed_data = preprocess_data_op(extracted_data.output)
+    preprocess_data(
+        file_path=extracted_data.output,
+    )
 
     # Step 3: Perform EDA
-    eda_task = eda_op(preprocessed_data.output)
+    eda()
 
     # Step 4: Train model
-    model = train_model_op(preprocessed_data.output)
+    train_model()
 
     # Step 5: Test model
-    test_samples = ['Hi, how you doing?', 'Congratuations! You have won a $1000 prize! Text 1 to 1423.']
-    test_model_op(model.output, test_samples)
+    test_samples = ['Hi, how you doing?', 'Congratulations! You have won a $1000 prize! Text 1 to 1423.']
+    test_output = test_model(sample_messages=test_samples)
+    print(test_output)
 
 # Compile the pipeline
 if __name__ == '__main__':

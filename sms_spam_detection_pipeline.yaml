@@ -1,0 +1,284 @@
+# PIPELINE DEFINITION
+# Name: sms-spam-detection-pipeline
+# Description: A pipeline for detecting spam messages from SMS data
+components:
+  comp-eda:
+    executorLabel: exec-eda
+  comp-extract-data:
+    executorLabel: exec-extract-data
+    outputDefinitions:
+      parameters:
+        Output:
+          parameterType: STRING
+  comp-preprocess-data:
+    executorLabel: exec-preprocess-data
+    inputDefinitions:
+      parameters:
+        file_path:
+          parameterType: STRING
+  comp-test-model:
+    executorLabel: exec-test-model
+    inputDefinitions:
+      parameters:
+        sample_messages:
+          parameterType: LIST
+    outputDefinitions:
+      parameters:
+        Output:
+          parameterType: LIST
+  comp-train-model:
+    executorLabel: exec-train-model
+deploymentSpec:
+  executors:
+    exec-eda:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - eda
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.7.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"'  &&\
+          \  python3 -m pip install --quiet --no-warn-script-location 'pandas' 'matplotlib'\
+          \ 'numpy' && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef eda() -> None:\n    import pandas as pd\n    import matplotlib.pyplot\
+          \ as plt\n    import numpy as np\n\n    df = pd.read_csv('/mnt/data/preprocessed_smsspamcollection.csv')\n\
+          \n    print('Missing values: ')\n    print(df.isnull().sum(),'\\n')\n\n\
+          \    print('Categories: ',df['label'].unique(),'\\n')\n\n    print('Rate\
+          \ of each category: ')\n    print(df['label'].value_counts())\n\n    plt.xscale('log')\n\
+          \    bins = 1.15**(np.arange(0,50))\n    plt.hist(df[df['label']=='ham']['length'],\
+          \ bins=bins,alpha=0.8)\n    plt.hist(df[df['label']=='spam']['length'],\
+          \ bins=bins,alpha=0.8)\n    plt.legend(('ham','spam'))\n    plt.title('Inference:\
+          \ usually spams are longer in text compared to ham')\n    plt.xlabel('Text\
+          \ length')\n    plt.ylabel('Category rate')\n    plt.savefig('/mnt/data/length_histogram.png')\n\
+          \    plt.clf()\n\n    plt.xscale('log')\n    bins = 1.15**(np.arange(0,50))\n\
+          \    plt.hist(df[df['label']=='ham']['punct'], bins=bins,alpha=0.8)\n  \
+          \  plt.hist(df[df['label']=='spam']['punct'], bins=bins,alpha=0.8)\n   \
+          \ plt.legend(('ham','spam'))\n    plt.title('Inference: a small tendency\
+          \ of spams towards more punctutations (not a firm inference)')\n    plt.xlabel('Text\
+          \ length')\n    plt.ylabel('Category rate')\n    plt.savefig('/mnt/data/punct_histogram.png')\n\
+          \n"
+        image: python:3.8
+    exec-extract-data:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - extract_data
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.7.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"'  &&\
+          \  python3 -m pip install --quiet --no-warn-script-location 'requests' 'pandas'\
+          \ && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef extract_data() -> dsl.OutputPath(str):\n    import requests\n\
+          \    import zipfile\n    import io\n    import pandas as pd\n\n    url =\
+          \ 'https://archive.ics.uci.edu/static/public/228/sms+spam+collection.zip'\n\
+          \n    # Step 1: Download the zip file\n    response = requests.get(url)\n\
+          \    response.raise_for_status()  # Check if the request was successful\n\
+          \n    # Step 2: Extract the contents of the zip file\n    with zipfile.ZipFile(io.BytesIO(response.content))\
+          \ as z:\n        with z.open('SMSSpamCollection') as f:\n            # Step\
+          \ 3: Read the contents into a DataFrame\n            df = pd.read_csv(f,\
+          \ sep='\\t', names=[\"label\", \"message\"], header=None)\n\n    # Step\
+          \ 4: Save the DataFrame to a CSV file\n    output_path = '/mnt/data/smsspamcollection.csv'\n\
+          \    df.to_csv(output_path, index=False)\n\n    return output_path\n\n"
+        image: python:3.8
+    exec-preprocess-data:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - preprocess_data
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.7.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"'  &&\
+          \  python3 -m pip install --quiet --no-warn-script-location 'pandas' &&\
+          \ \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef preprocess_data(file_path: dsl.InputPath(str)) -> None:\n   \
+          \ import pandas as pd\n    import string\n\n    df = pd.read_csv(file_path)\n\
+          \n    # Add 'length' and 'punct' features\n    df['length'] = df['message'].apply(len)\n\
+          \    df['punct'] = df['message'].apply(lambda x: sum([1 for char in x if\
+          \ char in string.punctuation]))\n\n    # Save the preprocessed data\n  \
+          \  df.to_csv('/mnt/data/preprocessed_smsspamcollection.csv', index=False)\n\
+          \n"
+        image: python:3.8
+    exec-test-model:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - test_model
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.7.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"'  &&\
+          \  python3 -m pip install --quiet --no-warn-script-location 'scikit-learn'\
+          \ 'joblib' && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef test_model( sample_messages: List[str]) -> List[str]:\n    import\
+          \ joblib\n    model = joblib.load('/mnt/data/text_clf.joblib')\n    predictions\
+          \ = model.predict(sample_messages)\n    return predictions\n\n"
+        image: python:3.8
+    exec-train-model:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - train_model
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.7.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"'  &&\
+          \  python3 -m pip install --quiet --no-warn-script-location 'pandas' 'scikit-learn'\
+          \ 'joblib' && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef train_model() -> None:\n    import pandas as pd\n    from sklearn.model_selection\
+          \ import train_test_split\n    from sklearn.pipeline import Pipeline\n \
+          \   from sklearn.ensemble import RandomForestClassifier\n    from sklearn.feature_extraction.text\
+          \ import TfidfVectorizer\n    from sklearn import metrics\n    import joblib\n\
+          \n    df = pd.read_csv('/mnt/data/preprocessed_smsspamcollection.csv')\n\
+          \n    X = df['message']\n    y = df['label']\n    X_train, X_test, y_train,\
+          \ y_test = train_test_split(X, y, test_size=0.33, random_state=0)\n\n  \
+          \  text_clf = Pipeline([('tfidf', TfidfVectorizer()), ('clf', RandomForestClassifier())])\n\
+          \    text_clf.fit(X_train, y_train)\n\n    predictions = text_clf.predict(X_test)\n\
+          \n    df_conf_mat = pd.DataFrame(metrics.confusion_matrix(y_test, predictions),\
+          \ index=['ham', 'spam'], columns=['ham', 'spam'])\n    print(df_conf_mat,\
+          \ '\\n')\n\n    clf_report = metrics.classification_report(y_test, predictions)\n\
+          \    print(clf_report, '\\n')\n\n    acc = metrics.accuracy_score(y_test,\
+          \ predictions)\n    print('Model accuracy: ', acc * 100)\n\n    # Save the\
+          \ model to a file\n    joblib.dump(text_clf, '/mnt/data/text_clf.joblib')\n\
+          \n"
+        image: python:3.8
+pipelineInfo:
+  description: A pipeline for detecting spam messages from SMS data
+  name: sms-spam-detection-pipeline
+root:
+  dag:
+    tasks:
+      eda:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-eda
+        taskInfo:
+          name: eda
+      extract-data:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-extract-data
+        taskInfo:
+          name: extract-data
+      preprocess-data:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-preprocess-data
+        dependentTasks:
+        - extract-data
+        inputs:
+          parameters:
+            file_path:
+              taskOutputParameter:
+                outputParameterKey: Output
+                producerTask: extract-data
+        taskInfo:
+          name: preprocess-data
+      test-model:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-test-model
+        inputs:
+          parameters:
+            sample_messages:
+              runtimeValue:
+                constant:
+                - Hi, how you doing?
+                - Congratulations! You have won a $1000 prize! Text 1 to 1423.
+        taskInfo:
+          name: test-model
+      train-model:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-train-model
+        taskInfo:
+          name: train-model
+schemaVersion: 2.1.0
+sdkVersion: kfp-2.7.0
