@@ -33,3 +33,6 @@ Kind: Kind runs Kubernetes clusters in Docker containers.
 
 ## Cloud Deployment
 Kubeflow can be deployed on various cloud platforms, including Google Cloud Platform (GCP), Amazon Web Services (AWS), Microsoft Azure.
+
+-----------------
+
