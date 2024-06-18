@@ -1,3 +1,5 @@
+This repository contains a Kubeflow-based MLops app to detect spam message, built upon a data pipeline for extraction, preprocessing, training, and model testing.
+
 Kubeflow is a powerful tool designed to simplify and streamline machine learning operations (MLOps) on Kubernetes.
 
 # Why Kubeflow
@@ -17,3 +19,5 @@ Note: please ensure you have installed Kubeflow Pipeline (KFP) package version 2
 ```
 pip install kfp==2.7.0
 ```
+-----------------
+
