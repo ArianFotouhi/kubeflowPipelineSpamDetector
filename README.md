@@ -9,3 +9,11 @@ Kubeflow is designed to be platform-agnostic (i.e. cross platform), meaning it c
 
 ## Automation
 Kubeflow supports scheduling of pipeline runs, allowing for automatic retraining and evaluation of models at regular intervals. Also, built-in support for hyperparameter tuning with tools like Katib helps automate the optimization of model parameters.
+
+
+-----------------
+
+Note: please ensure you have installed Kubeflow Pipeline (KFP) package version 2.7.0, as significant changes in each version may impact code functionality. To install version 2.7.0, run the following command
+```
+pip install kfp==2.7.0
+```
