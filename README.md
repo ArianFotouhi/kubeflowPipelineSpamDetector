@@ -20,6 +20,18 @@ Note: please ensure you have installed Kubeflow Pipeline (KFP) package version 2
 pip install kfp==2.7.0
 ```
 -----------------
+# Prerequisites for Working with Kubernetes
+## 1. Container Runtime
+Example: Docker
+## 2. Kubernetes Command-Line Interface
+Tool: kubectl
+## 3. Kubernetes Cluster Management Tool:
+Example: Kubeadm
+## 4. Network Plugin:
+Examples: Calico, Flannel, Weave Net
+## 5. Container Registry:
+Examples: Docker Hub, Google Container Registry
+-----------------
 
 # How to deploy Kubeflow app
 When YAML file of app is compiled, you can either deploy it on local or cloud based host.
@@ -35,4 +47,6 @@ Kind: Kind runs Kubernetes clusters in Docker containers.
 Kubeflow can be deployed on various cloud platforms, including Google Cloud Platform (GCP), Amazon Web Services (AWS), Microsoft Azure.
 
 -----------------
+# Steps to install Kubeflow on McOS
+
 
