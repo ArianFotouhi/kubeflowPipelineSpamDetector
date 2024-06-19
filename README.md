@@ -21,16 +21,47 @@ pip install kfp==2.7.0
 ```
 -----------------
 # Prerequisites for Working with Kubernetes
-## 1. Container Runtime
+
+### Container Runtime
 Example: Docker
-## 2. Kubernetes Command-Line Interface
+
+### Kubernetes Command-Line Interface
 Tool: kubectl
-## 3. Kubernetes Cluster Management Tool:
+
+### Kubernetes Cluster Management Tool:
 Example: Kubeadm
-## 4. Network Plugin:
+
+### Network Plugin:
 Examples: Calico, Flannel, Weave Net
-## 5. Container Registry:
+
+### Container Registry:
 Examples: Docker Hub, Google Container Registry
+
+
+-----------------
+# Key Components of Kubeflow
+
+### Kubernetes Cluster
+
+Description: A Kubernetes cluster is a set of nodes that run containerized applications managed by Kubernetes. It consists of a master node (control plane) and worker nodes where applications run.
+Example: Minikube
+
+### Kubernetes Command-Line Interface
+
+Description: kubectl is the command-line tool used to interact with Kubernetes clusters. It allows you to deploy applications, inspect and manage cluster resources, and view logs.
+Example: kubectl, the standard CLI tool provided by Kubernetes.
+
+### Configuration Management Tool:
+
+Description: Tools like Kustomize manage Kubernetes configurations. They allow you to customize Kubernetes YAML configurations without using templates, making it easier to manage different environments (e.g., development, staging, production).
+Example: Kustomize, a tool for customizing Kubernetes resources declaratively.
+
+
+### Container Runtime:
+
+Description: A container runtime is the software that runs containers. It is responsible for managing container lifecycle, including starting, stopping, and managing container images.
+Example: Docker, a widely used container runtime that manages containerized applications
+
 -----------------
 
 # How to deploy Kubeflow app
@@ -46,7 +77,6 @@ Kind: Kind runs Kubernetes clusters in Docker containers.
 ## Cloud Deployment
 Kubeflow can be deployed on various cloud platforms, including Google Cloud Platform (GCP), Amazon Web Services (AWS), Microsoft Azure.
 
------------------
-# Steps to install Kubeflow on McOS
+
 
 
